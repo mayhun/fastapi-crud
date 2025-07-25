@@ -94,3 +94,13 @@ def delete_post(db: Session, post: models.Post):
     '''
     db.delete(post)
     db.commit()
+
+############################ AUTH ############################
+
+def reset_password(db: Session, user: models.User, new_password: str):
+    '''
+    비밀번호 변경
+    '''
+    hashed_pw = hash_password(new_password)
+    user.hashed_pw = hashed_pw
+    db.commit()
