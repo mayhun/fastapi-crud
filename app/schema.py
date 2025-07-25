@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, validator
 from typing import Optional
+import re
 
 # ---------------------------
 # 게시글 관련 스키마
@@ -60,3 +61,18 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+class EmailRequest(BaseModel):
+    email: EmailStr = Field(..., json_schema_extra={"example": "hong@naver.com"})
+
+class CodeVerifyRequest(BaseModel):
+    code: str
+
+class PasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=100, json_schema_extra={"example":"securePass123!"})
+
+    @validator("new_password")
+    def password_comlexity(cls, v):
+        if not re.match(r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=-]).{8,}$", v):
+            raise ValueError("비밀번호는 영문, 숫자, 특수문자를 포함해야합니다.")
+        return v
