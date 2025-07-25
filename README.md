@@ -14,11 +14,15 @@ JWT 인증을 통한 로그인/로그아웃 기능과 비동기 SQLAlchemy 기�
 │   │   ├── auth.py            # 로그인, 로그아웃 등 인증 관련 API 라우터
 │   │   ├── user.py            # 사용자 CRUD 관련 API 라우터
 │   │   └── post.py            # 게시글 CRUD 관련 API 라우터
-│   ├── utils/                 # 유틸리티 모듈 디렉토리
-│   │   ├── jwt.py             # JWT 토큰 생성 및 검증 함수
-│   │   └── security.py        # 비밀번호 해싱/검증 등의 보안 유틸리티
-│   ├── crud.py                # 데이터베이스 CRUD 로직 정의
-│   ├── database.py            # DB 연결 및 세션 설정
+│   ├── templates/                          # 템플릿
+│   │   └── email_verification.html         # 인증번호 메일 템플릿
+│   ├── utils/                              # 유틸리티 모듈 디렉토리
+│   │   ├── email.py                        # 이메일 발송을 위한 SMTP 설정
+│   │   ├── jwt.py                          # JWT 토큰 생성 및 검증 함수
+│   │   ├── redis_client.py                 # Redis 설정
+│   │   └── security.py                     # 비밀번호 해싱/검증 등의 보안 유틸리티
+│   ├── crud.py                             # 데이터베이스 CRUD 로직 정의
+│   ├── database.py                         # DB 연결 및 세션 설정
 │   ├── main.py                
 │   ├── models.py              # SQLAlchemy ORM 모델 정의
 │   └── schema.py              # Pydantic을 이용한 데이터 검증 스키마 정의
@@ -41,6 +45,12 @@ DB_NAME=fastapi_crud
 SECRET_KEY=SECRET_KEY
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+EMAIL_USER=test@gmail.com
+EMAIL_PASS='16자리 pass 번호'
+
+REDIS_HOST=redis
+REDIS_PORT=6379
 ```
 ## 📌 실행 방법
 ### Docker로 실행
