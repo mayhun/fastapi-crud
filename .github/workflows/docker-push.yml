@@ -48,29 +48,49 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     steps:
+      # 1) EC2에 앱 디렉토리 보장
+      - name: Ensure app dir on EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}   # Ubuntu면 'ubuntu'
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p "$HOME/app"
+
+      # 2) 로컬 레포의 docker-compose.yml 업로드 (경로가 다르면 source 수정)
+      - name: Upload docker-compose.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "/home/${{ secrets.EC2_USER }}/app"
+
+      # 3) 배포: Docker Hub 로그인 → IMAGE_TAG 주입 → pull+up
       - name: Deploy on EC2 (pull & restart)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}       # 예: 1.2.3.4
-          username: ${{ secrets.EC2_USER }}   # Ubuntu면 'ubuntu'
-          key: ${{ secrets.EC2_SSH_KEY }}     # -----BEGIN ... END----- 전체
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -euo pipefail
-            echo "whoami: $(whoami) | HOME: $HOME"
-
-            # 앱 디렉토리와 compose 파일 확인
-            mkdir -p "$HOME/app"
             cd "$HOME/app"
-            if [ ! -f docker-compose.yml ]; then
-              echo "❌ $PWD/docker-compose.yml 이 없습니다. (EC2에 운영용 compose를 만들어 주세요)"
+
+            # .env는 EC2에만(이미 수동 업로드했다는 전제)
+            if [ ! -f .env ]; then
+              echo "❌ $PWD/.env 가 없습니다. (.env는 깃에 올리지 말고 EC2에만 두세요)"
               exit 1
             fi
 
             # Docker Hub 로그인(프라이빗/레이트리밋 대비)
             docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # 이번 커밋 해시를 태그로 주입 → compose에서 ${IMAGE_TAG} 사용
+            # 이번 커밋으로 태그 주입 → compose에서 ${IMAGE_TAG} 사용
             export IMAGE_TAG=${GITHUB_SHA}
 
-            # 서버에서 빌드 금지, 항상 최신 이미지 pull 후 재기동
+            # 서버 빌드 없이 최신 이미지 적용
             docker compose up -d --pull always --no-build
