@@ -48,13 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     steps:
-      # ✅ 반드시 필요: 이 잡에서도 레포를 체크아웃
       - name: Checkout
         uses: actions/checkout@v4
-
-      # (선택) 디버깅: 파일이 보이는지 확인
-      - name: List workspace
-        run: ls -al
 
       - name: Ensure app dir on EC2
         uses: appleboy/ssh-action@v1
@@ -75,21 +70,27 @@ jobs:
           source: "docker-compose.yml"
           target: "/home/${{ secrets.EC2_USER }}/app"
 
-      - name: Deploy on EC2 (pull & restart)
+      - name: Deploy on EC2 (pull & restart with SHA tag)
         uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ github.sha }}  
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_TAG
           script: |
             set -euo pipefail
             cd "$HOME/app"
 
-            if [ ! -f .env ]; then
-              echo "❌ $PWD/.env 가 없습니다. (.env는 EC2에 수동 업로드)"
-              exit 1
-            fi
+            # .env는 EC2에만 있어야 함
+            [ -f .env ] || { echo "❌ $PWD/.env 없음 (.env는 EC2에 수동 업로드)"; exit 1; }
 
-            docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            export IMAGE_TAG=${GITHUB_SHA}
-            docker compose up -d --pull always --no-build
+            # Docker Hub 로그인 (경고 없애려면 --password-stdin 사용)
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USER }}" --password-stdin
+
+            # compose에서 ${IMAGE_TAG} 치환에 사용할 값 확인
+            echo "Using IMAGE_TAG=$IMAGE_TAG"
+
+            # 최신 이미지 적용(서버 빌드 금지)
+            IMAGE_TAG="$IMAGE_TAG" docker compose up -d --pull always --no-build
