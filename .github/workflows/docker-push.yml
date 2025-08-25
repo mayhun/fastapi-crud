@@ -51,18 +51,26 @@ jobs:
       - name: Deploy on EC2 (pull & restart)
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}     
-          username: ${{ secrets.EC2_USER }} 
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}       # 예: 1.2.3.4
+          username: ${{ secrets.EC2_USER }}   # Ubuntu면 'ubuntu'
+          key: ${{ secrets.EC2_SSH_KEY }}     # -----BEGIN ... END----- 전체
           script: |
-            set -e
-            cd ~/app
+            set -euo pipefail
+            echo "whoami: $(whoami) | HOME: $HOME"
 
-            # Docker Hub 로그인 (프라이빗/레이트리밋 대비)
+            # 앱 디렉토리와 compose 파일 확인
+            mkdir -p "$HOME/app"
+            cd "$HOME/app"
+            if [ ! -f docker-compose.yml ]; then
+              echo "❌ $PWD/docker-compose.yml 이 없습니다. (EC2에 운영용 compose를 만들어 주세요)"
+              exit 1
+            fi
+
+            # Docker Hub 로그인(프라이빗/레이트리밋 대비)
             docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # 이번 배포 이미지 태그를 셸 환경변수로 주입 (compose가 치환에 사용)
+            # 이번 커밋 해시를 태그로 주입 → compose에서 ${IMAGE_TAG} 사용
             export IMAGE_TAG=${GITHUB_SHA}
 
-            # 항상 최신 이미지로 교체 (빌드 금지)
+            # 서버에서 빌드 금지, 항상 최신 이미지 pull 후 재기동
             docker compose up -d --pull always --no-build
