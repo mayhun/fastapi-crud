@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app import crud
 from app.utils.security import verify_password, create_code
@@ -16,8 +16,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # 로그인 관련
 # ---------------------------
 @router.post("/login", response_model=TokenResponse, summary="로그인 및 JWT 토큰 발급")
-def login(request: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    user = crud.get_user_by_email(db, request.email)
+async def login(request: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+    user = await crud.get_user_by_email(db, request.email)
     if not user or not verify_password(request.password, user.hashed_pw):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -39,7 +39,7 @@ def login(request: LoginRequest, response: Response, db: Session = Depends(get_d
     return {"access_token": token, "token_type": "bearer"}
 
 @router.post("/logout", summary="로그아웃")
-def logout(response: Response):
+async def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         path="/",
@@ -50,7 +50,7 @@ def logout(response: Response):
 # 패스워드 수정
 # ---------------------------
 @router.post('/passowrd/reset-code', summary='패스워드 변경 인증번호 요청')
-def send_reset_code(request: EmailRequest, response: Response):
+async def send_reset_code(request: EmailRequest, response: Response):
     
     key = f"reset_code:{request.email}"
 
@@ -86,7 +86,7 @@ def send_reset_code(request: EmailRequest, response: Response):
     return {"message": "인증번호가 이메일로 전송되었습니다."}
 
 @router.post("/password/verify-code", summary='인증번호 검증')
-def verify_code(request: CodeVerifyRequest, response:Response, reset_token: str = Cookie(...)):
+async def verify_code(request: CodeVerifyRequest, response:Response, reset_token: str = Cookie(...)):
 
     # reset_token 디코딩 → 이메일 추출
     payload = decode_token(reset_token)
@@ -133,7 +133,7 @@ def verify_code(request: CodeVerifyRequest, response:Response, reset_token: str 
 
 
 @router.post("/password/reset", summary="비밀번호 변경")
-def reset_password(request: PasswordResetRequest, response: Response, change_token: str = Cookie(...), db: Session = Depends(get_db)):
+async def reset_password(request: PasswordResetRequest, response: Response, change_token: str = Cookie(...), db: AsyncSession = Depends(get_db)):
 
     payload = decode_token(change_token)
 
@@ -154,10 +154,10 @@ def reset_password(request: PasswordResetRequest, response: Response, change_tok
         raise HTTPException(status_code=403, detail="이메일 인증을 완료해주세요.")
 
     # 사용자 조회
-    user = crud.get_user_by_email(db, email)
+    user = await crud.get_user_by_email(db, email)
     
     # 비밀번호 변경
-    crud.reset_password(db=db, user=user, new_password=request.new_password)
+    await crud.reset_password(db=db, user=user, new_password=request.new_password)
     
     # 인증번호 및 토큰 제거
     r.delete(key)
