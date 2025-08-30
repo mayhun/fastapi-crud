@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, validator
-from typing import Optional
+from typing import Optional, List
 import re
 
 # ---------------------------
@@ -76,3 +76,10 @@ class PasswordResetRequest(BaseModel):
         if not re.match(r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+=-]).{8,}$", v):
             raise ValueError("비밀번호는 영문, 숫자, 특수문자를 포함해야합니다.")
         return v
+    
+# ---------------------------
+# 파일 관련 스키마
+# ---------------------------
+
+class FileListRes(BaseModel):
+    files: List[str]
